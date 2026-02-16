@@ -5,19 +5,25 @@ import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import { envs } from './config';
 
 async function bootstrap() {
-  const app = await NestFactory.createMicroservice<MicroserviceOptions>(
-    AppModule,
-    {
-      transport: Transport.TCP,
-      options:{
-        port: envs.port
-      }
-    }
-  );
-  const logger = new Logger('Auth-MS')
+  const logger = new Logger('Users-MS');
 
+  const app = await NestFactory.create(AppModule);
 
-  await app.listen();
+  app.connectMicroservice({
+    transport: Transport.RMQ,
+    options: {
+      urls: [envs.rabbit_url],
+      queue: 'notifications.queue',
+      queueOptions: {
+        durable: true,
+      },
+    },
+  });
+
+  //Inicia Rabitt
+  await app.startAllMicroservices();
+
+  await app.listen(envs.port);
   logger.log(`Microservice is listening on port ${envs.port}`);
 }
 bootstrap();

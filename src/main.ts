@@ -20,28 +20,14 @@ async function bootstrap() {
     },
   });
 
-  //Inicia Rabitt
-  await app.startAllMicroservices();
-  const app = await NestFactory.createMicroservice<MicroserviceOptions>(
-    AppModule,
-    {
-      transport: Transport.TCP,
-      options:{
-        host: envs.host,
-        port: envs.port
-      }
-    }
-  );
 
   app.useGlobalPipes(
     new ValidationPipe({
-      whitelist: true, 
+      whitelist: true,
       forbidNonWhitelisted: true,
-      transform: true
-    })
-  )
-
-  const logger = new Logger('Users-MS')
+      transform: true,
+    }),
+  );
 
   await app.startAllMicroservices();
 

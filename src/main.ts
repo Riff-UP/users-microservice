@@ -13,13 +13,12 @@ async function bootstrap() {
     transport: Transport.RMQ,
     options: {
       urls: [envs.rabbit_url],
-      queue: 'notifications.queue',
+      queue: 'users.queue',
       queueOptions: {
         durable: true,
       },
     },
   });
-
 
   app.useGlobalPipes(
     new ValidationPipe({

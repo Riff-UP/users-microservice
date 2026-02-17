@@ -36,5 +36,23 @@ model User {
 
   createdAt DateTime @default(now()) @map("created_at")
 
+  passwordResets PasswordReset[]
+
   @@map("users")
+}
+
+model PasswordReset {
+  id String @id @default(uuid()) @map("psswd_id")
+
+  userId String @map("user_id")
+
+  token String
+
+  expiresAt DateTime @map("expires_at")
+
+  used Boolean @default(false)
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("password_resets")
 }

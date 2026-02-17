@@ -6,7 +6,13 @@ import { UserFollowsModule } from './user-follows/user-follows.module';
 import { UserStatsModule } from './user-stats/user-stats.module';
 
 @Module({
-  imports: [UsersModule, SocialMediaModule, PasswordResetsModule, UserFollowsModule, UserStatsModule],
+  imports: [
+    UsersModule,
+    SocialMediaModule,
+    PasswordResetsModule,
+    UserFollowsModule,
+    UserStatsModule,
+  ],
   controllers: [],
   providers: [],
 })

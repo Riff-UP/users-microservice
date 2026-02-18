@@ -2,22 +2,30 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { PrismaService } from 'prisma/prisma.service';
+import { UserStatsService } from 'src/user-stats/user-stats.service';
 
 @Injectable()
 export class UsersService implements OnModuleInit {
 
   private readonly logger = new Logger('UsersService');
 
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly userStatsService: UserStatsService
+  ) { }
 
   onModuleInit() {
     this.logger.log('UsersService initialized')
   }
 
   async create(createUserDto: CreateUserDto) {
-    return await this.prisma.user.create({
+    const user = await this.prisma.user.create({
       data: createUserDto
     })
+
+    await this.userStatsService.create(user.id)
+    
+    return user
   }
 
   async findAll() {

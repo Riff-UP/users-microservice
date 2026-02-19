@@ -32,4 +32,20 @@ export class UsersController {
   remove(@Payload(new ParseUUIDPipe()) id: string) {
     return this.usersService.remove(id);
   }
+
+  @MessagePattern('findUserByEmail')
+  findByEmail(@Payload() payload: { email: string }) {
+    return this.usersService.findByEmail(payload.email);
+  }
+
+  @MessagePattern('generateToken')
+  generateToken(@Payload() user: any) {
+    return this.usersService.generateToken(user);
+  }
+
+  @MessagePattern('createUserGoogle')
+  createUserGoogle(@Payload() payload: any) {
+    return this.usersService.createUserGoogle(payload);
+  }
+  
 }

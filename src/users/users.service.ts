@@ -3,6 +3,8 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { PrismaService } from 'prisma/prisma.service';
 import { UserStatsService } from 'src/user-stats/user-stats.service';
+import * as jwt from 'jsonwebtoken';
+import { RpcException } from '@nestjs/microservices';
 
 @Injectable()
 export class UsersService implements OnModuleInit {
@@ -71,6 +73,52 @@ export class UsersService implements OnModuleInit {
     return await this.prisma.user.delete({
       where: { id }
     })
-
   }
+
+  async findByEmail(email: string) {
+  const user = await this.prisma.user.findFirst({
+    where: { email }
+  });
+
+  if (!user) {
+    throw new RpcException({
+      message: `User with email ${email} not found`,
+      statusCode: 404
+    });
+  }
+
+  return user;
+}
+
+  generateToken(user: any) {
+  return jwt.sign(
+    { id: user.id, email: user.email, role: user.role },
+    process.env.JWT_SECRET,
+    { expiresIn: '24h' }
+  );
+  }
+
+  async createUserGoogle(payload: any) {
+    // Verificar si ya existe por googleId
+    const existingUser = await this.prisma.user.findFirst({
+      where: { googleId: payload.googleId }
+    });
+
+    if (existingUser) return existingUser;
+
+    // Crear usuario nuevo
+    const user = await this.prisma.user.create({
+      data: {
+        name: payload.name,
+        email: payload.email,
+        googleId: payload.googleId,
+        password: '',
+        role: payload.role ?? 'USER'
+      }
+    });
+
+    await this.userStatsService.create(user.id);
+    return user;
+  }
+
 }

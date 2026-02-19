@@ -1,6 +1,6 @@
 import { Controller } from '@nestjs/common';
 import { MessagePattern, Payload } from '@nestjs/microservices';
-import { PasswordResetsService } from './password-resets.service';
+import { PasswordResetsService } from './password-resets-sender.service';
 import { CreatePasswordResetDto } from './dto/create-password-reset.dto';
 import { UpdatePasswordResetDto } from './dto/update-password-reset.dto';
 
@@ -25,7 +25,10 @@ export class PasswordResetsController {
 
   @MessagePattern('updatePasswordReset')
   update(@Payload() updatePasswordResetDto: UpdatePasswordResetDto) {
-    return this.passwordResetsService.update(updatePasswordResetDto.id, updatePasswordResetDto);
+    return this.passwordResetsService.update(
+      updatePasswordResetDto.id,
+      updatePasswordResetDto,
+    );
   }
 
   @MessagePattern('removePasswordReset')

@@ -1,3 +1,3 @@
-export class mail {
+export class mailDto {
   mail!: string;
 }

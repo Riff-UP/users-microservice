@@ -13,10 +13,19 @@ async function bootstrap() {
     transport: Transport.RMQ,
     options: {
       urls: [envs.rabbit_url],
-      queue: 'users.queue',
+      queue: 'riff_queue',
       queueOptions: {
         durable: true,
       },
+    },
+  });
+
+    // TCP para que el gateway se comunique
+  app.connectMicroservice({
+    transport: Transport.TCP,
+    options: {
+      host: '0.0.0.0',
+      port: 3001,
     },
   });
 

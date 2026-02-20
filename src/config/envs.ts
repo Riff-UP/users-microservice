@@ -4,12 +4,14 @@ import 'dotenv/config';
 interface EnvVars {
   PORT: number;
   RABBIT_URL: string;
+  RESEND_KEY: string;
 }
 
 const envSchema = joi
   .object({
     PORT: joi.number().required(),
     RABBIT_URL: joi.string().required(),
+    RESEND_KEY: joi.string().required(),
   })
   .unknown(true);
 
@@ -24,4 +26,5 @@ const envVars: EnvVars = value;
 export const envs = {
   port: envVars.PORT,
   rabbit_url: envVars.RABBIT_URL,
+  resend_key: envVars.RESEND_KEY,
 };

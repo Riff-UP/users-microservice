@@ -1,16 +1,21 @@
 import { Controller, ParseUUIDPipe } from '@nestjs/common';
-import { MessagePattern, Payload } from '@nestjs/microservices';
+import { EventPattern, MessagePattern, Payload } from '@nestjs/microservices';
 import { UsersService } from './users.service';
+import { mailDto } from 'src/password-resets/dto/mail-dto';
+import { PasswordResetsService } from 'src/password-resets/password-resets-sender.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 
 @Controller()
 export class UsersController {
-  constructor(private readonly usersService: UsersService) { }
+  constructor(
+    private readonly usersService: UsersService,
+    private readonly passwordResetsService: PasswordResetsService,
+  ) {}
 
-  @MessagePattern('createUser')
-  create(@Payload() createUserDto: CreateUserDto) {
-    return this.usersService.create(createUserDto);
+  @MessagePattern('psswrdResetSender')
+  sendPasswordReset(@Payload() mailDto: mailDto) {
+    return this.passwordResetsService.psswrdResetSender(mailDto);
   }
 
   @MessagePattern('findAllUsers')

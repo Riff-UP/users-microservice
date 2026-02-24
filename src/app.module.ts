@@ -4,8 +4,25 @@ import { SocialMediaModule } from './social-media/social-media.module';
 import { PasswordResetsModule } from './password-resets/password-resets.module';
 import { UserFollowsModule } from './user-follows/user-follows.module';
 import { UserStatsModule } from './user-stats/user-stats.module';
+import { PrismaModule } from 'prisma/prisma.module';
+import { ConfigModule } from '@nestjs/config';
+import { MongooseModule } from '@nestjs/mongoose';
+import { envs } from './config';
 
 @Module({
+  imports: [
+    ConfigModule.forRoot({
+      isGlobal: true,
+      envFilePath: '.env'
+    }),
+    MongooseModule.forRoot(envs.mongoUri),
+    UsersModule, 
+    SocialMediaModule, 
+    PasswordResetsModule, 
+    UserFollowsModule, 
+    UserStatsModule, 
+    PrismaModule
+  ],
   imports: [
     UsersModule,
     SocialMediaModule,

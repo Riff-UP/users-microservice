@@ -1,0 +1,72 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url = env("DATABASE_URL")
+}
+
+enum UserRole {
+  USER
+  ARTIST
+}
+
+model User {
+  id String @id @default(uuid())
+
+  name String
+
+  email String @unique
+
+  password String
+
+  googleId String? @map("google_id")
+
+  biography String?
+
+  role UserRole
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  socialMedia SocialMedia[]
+  following UserFollows[] @relation("follower")
+  followers UserFollows[] @relation("followed")
+
+  @@map("users")
+}
+
+
+model SocialMedia {
+  id String @id @default(uuid())
+
+  userId String @map("user_id")
+
+  url String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("social_media")
+}
+
+model UserFollows {
+  followerId String @map("follower_id")
+  followedId String @map("followed_id")
+
+  follower User @relation("follower", fields: [followerId], references: [id], onDelete: Cascade)
+  followed User @relation("followed", fields: [followedId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@id([followerId, followedId])
+  @@map("user_follows")
+}

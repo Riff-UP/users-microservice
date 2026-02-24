@@ -1,26 +1,124 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { PrismaService } from 'prisma/prisma.service';
+import { UserStatsService } from 'src/user-stats/user-stats.service';
+import * as jwt from 'jsonwebtoken';
+import { RpcException } from '@nestjs/microservices';
 
 @Injectable()
-export class UsersService {
-  create(createUserDto: CreateUserDto) {
-    return 'This action adds a new user';
+export class UsersService implements OnModuleInit {
+
+  private readonly logger = new Logger('UsersService');
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly userStatsService: UserStatsService
+  ) { }
+
+  onModuleInit() {
+    this.logger.log('UsersService initialized')
   }
 
-  findAll() {
-    return `This action returns all users`;
+  async create(createUserDto: CreateUserDto) {
+    const user = await this.prisma.user.create({
+      data: createUserDto
+    })
+
+    await this.userStatsService.create(user.id)
+    
+    return user
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} user`;
+  async findAll() {
+    return await this.prisma.user.findMany()
   }
 
-  update(id: number, updateUserDto: UpdateUserDto) {
-    return `This action updates a #${id} user`;
+  async findOne(id: string) {
+
+    const user = await this.prisma.user.findFirst({
+      where: {
+        id
+      }
+    })
+
+    if (!user) {
+      throw new Error(`User with id ${id} not found`)
+    }
+    return user;
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} user`;
+  async update(id: string, updateUserDto: UpdateUserDto) {
+    await this.findOne(id)
+
+    if (!id) {
+      throw new Error(`User with id ${id} not found`)
+    }
+
+    const { id: _, ...data } = updateUserDto;
+
+    return await this.prisma.user.update({
+      where: { id },
+      data
+    })
   }
+
+  async remove(id: string) {
+    await this.findOne(id)
+
+    if (!id) {
+      throw new Error(`User with id ${id} not found`)
+    }
+
+    return await this.prisma.user.delete({
+      where: { id }
+    })
+  }
+
+  async findByEmail(email: string) {
+  const user = await this.prisma.user.findFirst({
+    where: { email }
+  });
+
+  if (!user) {
+    throw new RpcException({
+      message: `User with email ${email} not found`,
+      statusCode: 404
+    });
+  }
+
+  return user;
+}
+
+  generateToken(user: any) {
+  return jwt.sign(
+    { id: user.id, email: user.email, role: user.role },
+    process.env.JWT_SECRET,
+    { expiresIn: '24h' }
+  );
+  }
+
+  async createUserGoogle(payload: any) {
+    // Verificar si ya existe por googleId
+    const existingUser = await this.prisma.user.findFirst({
+      where: { googleId: payload.googleId }
+    });
+
+    if (existingUser) return existingUser;
+
+    // Crear usuario nuevo
+    const user = await this.prisma.user.create({
+      data: {
+        name: payload.name,
+        email: payload.email,
+        googleId: payload.googleId,
+        password: '',
+        role: payload.role ?? 'USER'
+      }
+    });
+
+    await this.userStatsService.create(user.id);
+    return user;
+  }
+
 }

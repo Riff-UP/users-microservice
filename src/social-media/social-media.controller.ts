@@ -25,7 +25,10 @@ export class SocialMediaController {
 
   @MessagePattern('updateSocialMedia')
   update(@Payload() updateSocialMediaDto: UpdateSocialMediaDto) {
-    return this.socialMediaService.update(updateSocialMediaDto.id, updateSocialMediaDto);
+    return this.socialMediaService.update(
+      updateSocialMediaDto.id,
+      updateSocialMediaDto,
+    );
   }
 
   @MessagePattern('removeSocialMedia')

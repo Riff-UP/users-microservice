@@ -39,10 +39,26 @@ model User {
   socialMedia SocialMedia[]
   following UserFollows[] @relation("follower")
   followers UserFollows[] @relation("followed")
+  passwordResets PasswordReset[]
 
   @@map("users")
 }
 
+model PasswordReset {
+  id        String   @id @default(uuid())
+
+  userId    String   @map("user_id")
+
+  token     String
+
+  expiresAt DateTime @map("expires_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("password_resets")
+}
 
 model SocialMedia {
   id String @id @default(uuid())

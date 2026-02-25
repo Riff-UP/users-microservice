@@ -1,6 +1,3 @@
-import { UserRole } from "@prisma/client";
+import { UserRole } from '@prisma/client';
 
-export const UserRoleList = [
-    UserRole.USER,
-    UserRole.USER
-]
+export const UserRoleList = [UserRole.USER, UserRole.ARTIST];

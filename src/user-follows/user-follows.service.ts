@@ -1,16 +1,14 @@
-import { 
-  BadRequestException, 
-  Injectable, 
-  Logger, 
-  NotFoundException, 
-  OnModuleInit 
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  OnModuleInit,
 } from '@nestjs/common';
 import { CreateUserFollowDto } from './dto/create-user-follow.dto';
 import { PrismaService } from 'prisma/prisma.service';
 
 @Injectable()
 export class UserFollowsService implements OnModuleInit {
-
   private readonly logger = new Logger('UserFollowsService');
 
   constructor(private readonly prisma: PrismaService) {}
@@ -31,30 +29,36 @@ export class UserFollowsService implements OnModuleInit {
     if (existing) {
       await this.prisma.userFollows.delete({
         where: {
-          followerId_followedId: { followerId, followedId }
-        }
+          followerId_followedId: { followerId, followedId },
+        },
       });
-      return { following: false, message: `Se dejo de seguir al usuario ${followedId}` };
+      return {
+        following: false,
+        message: `Se dejo de seguir al usuario ${followedId}`,
+      };
     }
 
     await this.prisma.userFollows.create({
-      data: { followerId, followedId }
+      data: { followerId, followedId },
     });
 
-    return { following: true, message: `Ahora se sigue al usuario ${followedId}` };
+    return {
+      following: true,
+      message: `Ahora se sigue al usuario ${followedId}`,
+    };
   }
 
   async findAll(followerId: string) {
     return await this.prisma.userFollows.findMany({
-      where: { followerId }
+      where: { followerId },
     });
   }
 
   async findOne(followerId: string, followedId: string) {
     return await this.prisma.userFollows.findUnique({
       where: {
-        followerId_followedId: { followerId, followedId }
-      }
+        followerId_followedId: { followerId, followedId },
+      },
     });
   }
 }

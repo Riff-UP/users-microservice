@@ -26,3 +26,29 @@ services:
       - MONGO_INITDB_ROOT_USERNAME=${MONGO_USER}
       - MONGO_INITDB_ROOT_PASSWORD=${MONGO_PASSWORD}
       - MONGO_INITDB_DATABASE=${MONGO_DB_NAME}
+    networks:
+      - users-network
+
+  users-rabbit:
+    image: rabbitmq:3.12-management-alpine
+    container_name: riff_users_rabbit
+    restart: always
+    ports:
+      - ${RABBITMQ_PORT:-5672}:5672
+      - ${RABBITMQ_MANAGEMENT_PORT:-15672}:15672
+    environment:
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_USER:-guest}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASSWORD:-guest}
+    volumes:
+      - rabbit_data:/var/lib/rabbitmq
+    networks:
+      - users-network
+
+volumes:
+  postgres_data:
+  mongo_data:
+  rabbit_data:
+
+networks:
+  users-network:
+    driver: bridge

@@ -1,6 +1,6 @@
 import { HttpStatus, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { PrismaService } from 'prisma/prisma.service';
-import { MailDto } from './dto/mail.dto';
+import { MailDto } from '../dto/mail.dto';
 import {
   RpcException,
   ClientProxy,
@@ -8,17 +8,18 @@ import {
   Transport,
 } from '@nestjs/microservices';
 import { randomBytes, createHash } from 'node:crypto';
+import { envs } from '../../config';
+import { lastValueFrom } from 'rxjs';
 
 @Injectable()
 export class PasswordResetsSenderService implements OnModuleInit {
   private readonly logger = new Logger('PsswrdResetService');
   private client: ClientProxy;
   constructor(private readonly prisma: PrismaService) {
-    //No sé que es esta mamada pero hace que el producer funcione
     this.client = ClientProxyFactory.create({
       transport: Transport.RMQ,
       options: {
-        urls: ['amqp://localhost:5672'],
+        urls: [envs.rabbit_url],
         queue: 'riff_queue',
       },
     });
@@ -44,12 +45,13 @@ export class PasswordResetsSenderService implements OnModuleInit {
         return randomBytes(size).toString('hex');
       };
 
+      const rawTok = rawToken();
       //Hasheo
       const hashing = (generateToken: string) => {
         return createHash('sha256').update(generateToken).digest('hex');
       };
 
-      const hashedToken = hashing(rawToken());
+      const hashedToken = hashing(rawTok);
 
       await this.prisma.passwordReset.create({
         data: {
@@ -65,12 +67,14 @@ export class PasswordResetsSenderService implements OnModuleInit {
         userName: user.name,
         token: hashedToken,
       });
-      this.client.emit('send.resetPassword', {
-        mail: user.email,
-        userId: user.id,
-        userName: user.name,
-        token: hashedToken,
-      });
+      await lastValueFrom(
+        this.client.emit('send.resetPassword', {
+          mail: user.email,
+          userId: user.id,
+          userName: user.name,
+          token: rawTok,
+        }),
+      );
 
       this.logger.log('Evento emitido a RabbitMQ: send.resetPassword');
       return { status: HttpStatus.OK, message: 'Password reset email sent' };

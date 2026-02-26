@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { CreatePasswordResetDto } from './dto/create-password-reset.dto';
-import { UpdatePasswordResetDto } from './dto/update-password-reset.dto';
+import { CreatePasswordResetDto } from '../dto/create-password-reset.dto';
+import { UpdatePasswordResetDto } from '../dto/update-password-reset.dto';
 
 @Injectable()
 export class PasswordResetsService {

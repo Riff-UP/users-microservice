@@ -1,7 +1,7 @@
 import { Controller } from '@nestjs/common';
 import { MessagePattern, Payload } from '@nestjs/microservices';
-import { PasswordResetsService } from './password-resets.service';
-import { PasswordResetsSenderService } from './password-resets-sender.service';
+import { PasswordResetsService } from './services/password-resets.service';
+import { PasswordResetsSenderService } from './services/password-resets-sender.service';
 import { CreatePasswordResetDto } from './dto/create-password-reset.dto';
 import { UpdatePasswordResetDto } from './dto/update-password-reset.dto';
 import { MailDto } from './dto/mail.dto';

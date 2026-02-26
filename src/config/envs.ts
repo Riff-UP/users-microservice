@@ -5,6 +5,7 @@ interface EnvVars {
   PORT: number;
   MONGO_URI: string;
   RABBIT_URL: string;
+  JWT_SECRET: string;
 }
 
 const envSchema = joi
@@ -12,6 +13,7 @@ const envSchema = joi
     PORT: joi.number().required(),
     MONGO_URI: joi.string().required(),
     RABBIT_URL: joi.string().required(),
+    JWT_SECRET: joi.string().required(),
   })
   .unknown(true);
 
@@ -28,4 +30,5 @@ export const envs = {
   host: process.env.USERS_MS_HOST || '0.0.0.0',
   mongoUri: envVars.MONGO_URI,
   rabbit_url: envVars.RABBIT_URL,
+  jwtSecret: envVars.JWT_SECRET,
 };

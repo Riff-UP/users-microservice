@@ -1,26 +1,77 @@
 version: '3.8'
 services:
-  auth-db:
+  users-db:
     image: postgres:15-alpine
-    container_name: riff_auth
+    container_name: riff_users
     restart: always
     volumes:
-      - ./postgres:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
     ports:
       - ${DB_PORT}:5432
     environment:
       - POSTGRES_USER=${DB_USER}
       - POSTGRES_PASSWORD=${DB_PASSWORD}
       - POSTGRES_DB=${DB_NAME}
-  auth-mongo:
+    networks:
+      - users-network
+
+  users-mongo:
     image: mongo:6.0
-    container_name: riff_auth_stats
+    container_name: riff_users_stats
     restart: always
     volumes:
-      - ./mongo_data:/data/db
+      - mongo_data:/data/db
     ports:
       - ${MONGO_PORT}:27017
     environment:
       - MONGO_INITDB_ROOT_USERNAME=${MONGO_USER}
       - MONGO_INITDB_ROOT_PASSWORD=${MONGO_PASSWORD}
       - MONGO_INITDB_DATABASE=${MONGO_DB_NAME}
+    networks:
+      - users-network
+
+  users-rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: riff_users_rabbitmq
+    restart: always
+    ports:
+      - ${RABBITMQ_PORT}:5672
+      - 15673:15672
+    environment:
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_USER}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASSWORD}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - users-network
+
+  users-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: riff_users_app
+    restart: always
+    ports:
+      - ${PORT}:${PORT}
+    environment:
+      - PORT=${PORT}
+      - USERS_MS_HOST=0.0.0.0
+      - JWT_SECRET=${JWT_SECRET}
+      - RABBIT_URL=amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@users-rabbitmq:5672
+      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@users-db:5432/${DB_NAME}?schema=public
+      - MONGO_URI=mongodb://${MONGO_USER}:${MONGO_PASSWORD}@users-mongo:27017/${MONGO_DB_NAME}?authSource=admin&directConnection=true
+    depends_on:
+      - users-db
+      - users-mongo
+      - users-rabbitmq
+    networks:
+      - users-network
+
+volumes:
+  postgres_data:
+  mongo_data:
+  rabbitmq_data:
+
+networks:
+  users-network:
+    driver: bridge

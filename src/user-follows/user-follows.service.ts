@@ -7,13 +7,26 @@ import {
 } from '@nestjs/common';
 import { CreateUserFollowDto } from './dto/create-user-follow.dto';
 import { PrismaService } from 'prisma/prisma.service';
+import { ClientProxy, ClientProxyFactory, Transport } from '@nestjs/microservices';
+import { envs } from 'src/config';
 
 @Injectable()
 export class UserFollowsService implements OnModuleInit {
 
   private readonly logger = new Logger('UserFollowsService');
 
-  constructor(private readonly prisma: PrismaService) {}
+  private client: ClientProxy
+
+  constructor(private readonly prisma: PrismaService) {
+    this.client = ClientProxyFactory.create({
+      transport: Transport.RMQ,
+      options: {
+        urls: [envs.rabbit_url],
+        queue: 'riff_queue',
+        queueOptions: {durable: true}
+      }
+    })
+  }
 
   onModuleInit() {
     this.logger.log('UserFollowsService initialized');
@@ -34,12 +47,20 @@ export class UserFollowsService implements OnModuleInit {
           followerId_followedId: { followerId, followedId }
         }
       });
+      
       return { following: false, message: `Se dejo de seguir al usuario ${followedId}` };
     }
 
     await this.prisma.userFollows.create({
       data: { followerId, followedId }
     });
+
+    this.client.emit('new.follower',{
+      followerId,
+      followedId
+    })
+
+    this.logger.log(`Event emitted: new follower with id ${followerId} following ${followedId}`);
 
     return { following: true, message: `Ahora se sigue al usuario ${followedId}` };
   }
@@ -57,4 +78,13 @@ export class UserFollowsService implements OnModuleInit {
       }
     });
   }
+
+  async findFollowers(userId: string) : Promise<string[]>{
+    const follows = await this.prisma.userFollows.findMany({
+      where: { followedId: userId },
+      select: { followerId: true }
+    })
+    return follows.map(f => f.followerId)
+  }
+
 }

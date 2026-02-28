@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
   output   = "../node_modules/.prisma/client"
@@ -26,13 +20,15 @@ model User {
 
   email String @unique
 
-  password String
+  password String?
 
-  googleId String? @map("google_id")
+  googleId String? @map("google_id") // Para usuarios que se registran con Google
 
-  biography String?
+  biography String? @default("Sin biografía")
 
-  role UserRole
+  role UserRole @default(USER)
+
+  status Boolean @default(true) // soft delete
 
   createdAt DateTime @default(now()) @map("created_at")
 

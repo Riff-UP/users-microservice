@@ -1,13 +1,9 @@
-import {
-  HttpException,
-  HttpStatus,
-  Injectable,
-  Logger,
-  OnModuleInit,
-} from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { PrismaService } from 'prisma/prisma.service';
 import { PasswordTokenDto } from '../dto/password-token-dto';
 import { createHash } from 'node:crypto';
+import { RpcExceptionHelper } from '../../common';
+import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class PasswordResetTokenReceiverService implements OnModuleInit {
@@ -16,51 +12,38 @@ export class PasswordResetTokenReceiverService implements OnModuleInit {
   constructor(private readonly prisma: PrismaService) {}
 
   onModuleInit() {
-    this.logger.log('initialized');
+    this.logger.log('PasswordResetTokenReceiverService initialized');
   }
 
   async tokenReceiver(psswrdTknDto: PasswordTokenDto) {
     const { password, token } = psswrdTknDto;
 
-    const hashing = (generateToken: string) =>
-      createHash('sha256').update(generateToken).digest('hex');
+    const hashedToken = createHash('sha256').update(token).digest('hex');
 
-    const hashedToken = hashing(token);
+    const tokenRecord = await this.prisma.passwordReset.findFirst({
+      where: {
+        token: hashedToken,
+        used: false,
+        expiresAt: { gt: new Date() },
+      },
+    });
 
-    if (
-      !(await this.prisma.passwordReset.findFirst({
-        where: { token: hashedToken },
-      }))
-    )
-      try {
-        const tokenAprovall = await this.prisma.passwordReset.findFirstOrThrow({
-          where: {
-            token: hashedToken,
-            used: false,
-            expiresAt: { gt: new Date() },
-          },
-        });
+    if (!tokenRecord) RpcExceptionHelper.badRequest('Invalid or expired token');
 
-        // Update user password and mark token as used in a transaction
-        await this.prisma.$transaction([
-          this.prisma.user.update({
-            where: { id: tokenAprovall.userId },
-            data: { password },
-          }),
-          this.prisma.passwordReset.update({
-            where: { id: tokenAprovall.id },
-            data: { used: true } as any,
-          }),
-        ]);
+    const hashedPassword = await bcrypt.hash(password, 10);
 
-        return { status: HttpStatus.OK, message: 'Password updated' };
-      } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : String(err);
-        this.logger.warn('Token lookup or update failed', message);
-        throw new HttpException(
-          'Invalid or expired token',
-          HttpStatus.BAD_REQUEST
-        );
-      }
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: tokenRecord!.userId },
+        data: { password: hashedPassword },
+      }),
+      this.prisma.passwordReset.update({
+        where: { id: tokenRecord!.id },
+        data: { used: true },
+      }),
+    ]);
+
+    this.logger.log(`Password updated for user ${tokenRecord!.userId}`);
+    return { message: 'Password updated successfully' };
   }
 }

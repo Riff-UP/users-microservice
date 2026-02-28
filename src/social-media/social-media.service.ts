@@ -2,7 +2,7 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { CreateSocialMediaDto } from './dto/create-social-media.dto';
 import { UpdateSocialMediaDto } from './dto/update-social-media.dto';
 import { PrismaService } from 'prisma/prisma.service';
-import { RpcException } from '@nestjs/microservices';
+import { RpcExceptionHelper } from 'src/common';
 
 @Injectable()
 export class SocialMediaService implements OnModuleInit {
@@ -29,35 +29,18 @@ export class SocialMediaService implements OnModuleInit {
       where: { id },
     });
 
-    if (!socialMedia) {
-      throw new RpcException({
-        message: `SocialMedia with id ${id} not found`,
-        status: 404,
-      });
-    }
-    return socialMedia;
+    if (!socialMedia) RpcExceptionHelper.notFound('SocialMedia', id);
+    return socialMedia!;
   }
 
   async update(id: string, updateSocialMediaDto: UpdateSocialMediaDto) {
     await this.findOne(id);
-
     const { id: _, ...data } = updateSocialMediaDto;
-
-    return await this.prisma.socialMedia.update({
-      where: { id },
-      data,
-    });
+    return await this.prisma.socialMedia.update({ where: { id }, data });
   }
 
   async remove(id: string) {
     await this.findOne(id);
-
-    if (!id) {
-      throw new Error(`SocialMedia with id ${id} not found`);
-    }
-
-    return await this.prisma.socialMedia.delete({
-      where: { id },
-    });
+    return await this.prisma.socialMedia.delete({ where: { id } });
   }
 }

@@ -4,55 +4,75 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { PrismaService } from 'prisma/prisma.service';
 import { UserStatsService } from 'src/user-stats/user-stats.service';
 import * as jwt from 'jsonwebtoken';
-import { RpcException } from '@nestjs/microservices';
+import * as bcrypt from 'bcrypt'
+import { ClientProxy, ClientProxyFactory, Transport } from '@nestjs/microservices';
 import { envs } from '../config';
+import { RpcExceptionHelper } from 'src/common';
 
 @Injectable()
 export class UsersService implements OnModuleInit {
   private readonly logger = new Logger('UsersService');
+  private client : ClientProxy
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly userStatsService: UserStatsService
-  ) {}
+  ) {
+    this.client = ClientProxyFactory.create({
+      transport: Transport.RMQ,
+      options: {
+        urls: [envs.rabbit_url],
+        queue: 'riff_queue',
+        queueOptions: {durable: true}
+      }
+    })
+  }
 
   onModuleInit() {
     this.logger.log('UsersService initialized');
   }
 
   async create(createUserDto: CreateUserDto) {
-    const user = await this.prisma.user.create({
-      data: createUserDto,
+    const existingUser = await this.prisma.user.findFirst({
+      where: {email: createUserDto.email}
     });
 
-    await this.userStatsService.create(user.id);
+    if(existingUser) RpcExceptionHelper.conflict(`User with email ${createUserDto.email} already exists`)
+
+    const hashedPassword = createUserDto.password ? await bcrypt.hash(createUserDto.password, 10) : null
+
+    const user = await this.prisma.user.create({
+      data:{
+        ...createUserDto,
+        password: hashedPassword
+      }
+    })
+
+    await this.userStatsService.create(user.id)
 
     return user;
   }
 
   async findAll() {
-    return await this.prisma.user.findMany();
+    return await this.prisma.user.findMany({
+      where: {status: true}
+    });
   }
 
   async findOne(id: string) {
     const user = await this.prisma.user.findFirst({
       where: {
         id,
+        status: true
       },
     });
 
-    if (!user) {
-      throw new Error(`User with id ${id} not found`);
-    }
+    if (!user) RpcExceptionHelper.notFound(`User`, id)
     return user;
   }
 
   async update(id: string, updateUserDto: UpdateUserDto) {
     await this.findOne(id);
-
-    if (!id) {
-      throw new Error(`User with id ${id} not found`);
-    }
 
     const { id: _, ...data } = updateUserDto;
 
@@ -65,26 +85,50 @@ export class UsersService implements OnModuleInit {
   async remove(id: string) {
     await this.findOne(id);
 
-    if (!id) {
-      throw new Error(`User with id ${id} not found`);
-    }
-
     return await this.prisma.user.delete({
-      where: { id },
+      where: { id }
     });
+  }
+
+  async deactivate(id: string){
+    await this.findOne(id)
+
+    const shortId = id.replace(/-/g, '').slice(1,10)
+    
+    await this.prisma.user.update({
+      where : {id},
+      data: {
+        status: false,
+        name: `user${shortId}`,
+        biography: 'no bio'
+      }
+    })
+
+    this.client.emit('user.deactivated', {userId: id})
+    this.logger.log(`User with id ${id} deactivaded`)
+
+    return {message : 'Account deactivated succesfully'}
+  }
+
+  async addPassword(id: string, newPassword: string){
+    const user = await this.findOne(id)
+
+    if(user!.password) RpcExceptionHelper.badRequest(`The user already has registered password`)
+    
+    const hashedPassword = await bcrypt.hash(newPassword, 10)
+
+    return await this.prisma.user.update({
+      where: {id},
+      data: {password: hashedPassword}
+    })
   }
 
   async findByEmail(email: string) {
     const user = await this.prisma.user.findFirst({
-      where: { email },
+      where: { email, status: true },
     });
 
-    if (!user) {
-      throw new RpcException({
-        message: `User with email ${email} not found`,
-        statusCode: 404,
-      });
-    }
+    if (!user) RpcExceptionHelper.notFound('User', email)
 
     return user;
   }
@@ -111,7 +155,7 @@ export class UsersService implements OnModuleInit {
         name: payload.name,
         email: payload.email,
         googleId: payload.googleId,
-        password: '',
+        password: null,
         role: payload.role ?? 'USER',
       },
     });
@@ -122,25 +166,17 @@ export class UsersService implements OnModuleInit {
 
   async login(payload: { email: string; password: string }) {
     const user = await this.prisma.user.findFirst({
-      where: { email: payload.email },
+      where: { email: payload.email, status: true },
     });
 
-    if (!user) {
-      throw new RpcException({
-        message: 'Credenciales incorrectas',
-        statusCode: 401,
-      });
-    }
+    if (!user) RpcExceptionHelper.unauthorized('Invalid Credentials')
+
+    if(!user!.password) RpcExceptionHelper.badRequest('This account uses Google to login')
 
     // Verificar contraseña
-    const isPasswordValid = payload.password === user.password;
+    const isPasswordValid = await bcrypt.compare(payload.password, user!.password!)
 
-    if (!isPasswordValid) {
-      throw new RpcException({
-        message: 'Credenciales incorrectas',
-        statusCode: 401,
-      });
-    }
+    if (!isPasswordValid) RpcExceptionHelper.unauthorized('Invalid Credentials')
 
     // Generar token
     const token = this.generateToken(user);

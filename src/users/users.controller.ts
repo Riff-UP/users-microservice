@@ -52,4 +52,14 @@ export class UsersController {
   login(@Payload() payload: { email: string; password: string }) {
     return this.usersService.login(payload);
   }
+
+  @MessagePattern('deactivateUser')
+  deactivate(@Payload(new ParseUUIDPipe()) id: string) {
+    return this.usersService.deactivate(id);
+  }
+
+  @MessagePattern('addPassword')
+  addPassword(@Payload() payload: {id: string, newPassword: string}){
+    return this.usersService.addPassword(payload.id, payload.newPassword)
+  }
 }

@@ -1,20 +1,16 @@
-import { HttpStatus, Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { PrismaService } from 'prisma/prisma.service';
 import { MailDto } from '../dto/mail.dto';
-import {
-  RpcException,
-  ClientProxy,
-  ClientProxyFactory,
-  Transport,
-} from '@nestjs/microservices';
+import { ClientProxy, ClientProxyFactory, Transport } from '@nestjs/microservices';
 import { randomBytes, createHash } from 'node:crypto';
 import { envs } from '../../config';
-import { lastValueFrom } from 'rxjs';
+import { RpcExceptionHelper } from '../../common';
 
 @Injectable()
 export class PasswordResetsSenderService implements OnModuleInit {
-  private readonly logger = new Logger('PsswrdResetService');
+  private readonly logger = new Logger('PasswordResetsSenderService');
   private client: ClientProxy;
+
   constructor(private readonly prisma: PrismaService) {
     this.client = ClientProxyFactory.create({
       transport: Transport.RMQ,
@@ -26,7 +22,7 @@ export class PasswordResetsSenderService implements OnModuleInit {
   }
 
   onModuleInit() {
-    this.logger.log('PsswrdResetService');
+    this.logger.log('PasswordResetsSenderService initialized');
   }
 
   async psswrdResetSender(mailDto: MailDto) {
@@ -34,50 +30,27 @@ export class PasswordResetsSenderService implements OnModuleInit {
       where: { email: mailDto.mail },
     });
 
-    if (!user) {
-      throw new RpcException({
-        status: HttpStatus.NOT_FOUND,
-        message: 'user not found',
-      });
-    } else {
-      //Generación del token
-      const rawToken = (size: number = 32): string => {
-        return randomBytes(size).toString('hex');
-      };
+    if (!user) RpcExceptionHelper.notFound('User', mailDto.mail);
 
-      const rawTok = rawToken();
-      //Hasheo
-      const hashing = (generateToken: string) => {
-        return createHash('sha256').update(generateToken).digest('hex');
-      };
+    const rawToken = randomBytes(32).toString('hex');
+    const hashedToken = createHash('sha256').update(rawToken).digest('hex');
 
-      const hashedToken = hashing(rawTok);
-
-      await this.prisma.passwordReset.create({
-        data: {
-          userId: user.id,
-          token: hashedToken,
-          expiresAt: new Date(Date.now() + 900_000),
-        },
-      });
-
-      this.logger.log('Enviando evento a RabbitMQ: send.resetPassword', {
-        mail: user.email,
-        userId: user.id,
-        userName: user.name,
+    await this.prisma.passwordReset.create({
+      data: {
+        userId: user!.id,
         token: hashedToken,
-      });
-      await lastValueFrom(
-        this.client.emit('send.resetPassword', {
-          mail: user.email,
-          userId: user.id,
-          userName: user.name,
-          token: rawTok,
-        })
-      );
+        expiresAt: new Date(Date.now() + 900_000),
+      },
+    });
 
-      this.logger.log('Evento emitido a RabbitMQ: send.resetPassword');
-      return { status: HttpStatus.OK, message: 'Password reset email sent' };
-    }
+    this.client.emit('send.resetPassword', {
+      mail: user!.email,
+      userId: user!.id,
+      userName: user!.name,
+      token: rawToken,
+    });
+
+    this.logger.log('Evento emitido: send.resetPassword');
+    return { message: 'Password reset email sent' };
   }
 }

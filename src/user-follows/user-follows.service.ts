@@ -12,7 +12,6 @@ import {
   Transport,
 } from '@nestjs/microservices';
 import { envs } from 'src/config';
-import { lastValueFrom } from 'rxjs';
 
 @Injectable()
 export class UserFollowsService implements OnModuleInit {

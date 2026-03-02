@@ -120,20 +120,36 @@ export class UsersService implements OnModuleInit {
 
     const shortId = id.replace(/-/g, '').slice(1, 10);
 
-    await this.prisma.user.update({
-      where: { id },
-      data: {
-        status: false,
-        name: `user${shortId}`,
-        email: `deleted_${shortId}@riff.deleted`,
-        biography: 'no bio',
-        password: null,
-        googleId: null
-      }
-    })
+    // Transacción: hard delete de datos relacionados + soft delete del usuario
+    await this.prisma.$transaction([
+      // Hard delete de redes sociales
+      this.prisma.socialMedia.deleteMany({ where: { userId: id } }),
+      // Hard delete de follows (relaciones sin sentido si el usuario no existe)
+      this.prisma.userFollows.deleteMany({
+        where: { OR: [{ followerId: id }, { followedId: id }] },
+      }),
+      // Hard delete de tokens de recuperación
+      this.prisma.passwordReset.deleteMany({ where: { userId: id } }),
+      // Soft delete + anonimización del usuario
+      this.prisma.user.update({
+        where: { id },
+        data: {
+          status: false,
+          name: `user${shortId}`,
+          email: `deleted_${shortId}@riff.deleted`,
+          biography: 'no bio',
+          password: null,
+          googleId: null,
+        },
+      }),
+    ]);
 
-    this.client.emit('user.deactivated', {userId: id})
-    this.logger.log(`User with id ${id} deactivated`)
+    // Hard delete de estadísticas en MongoDB
+    await this.userStatsService.delete(id);
+
+    // Emitir evento para que otros microservicios (posts, events) reaccionen
+    this.client.emit('user.deactivated', { userId: id });
+    this.logger.log(`User with id ${id} deactivated`);
 
     return { message: 'Account deactivated succesfully' };
   }
@@ -225,5 +241,27 @@ export class UsersService implements OnModuleInit {
     const token = this.generateToken(user);
     const { password: _, ...safeUser } = user!;
     return { token, user: safeUser };
+  }
+
+  async promoteToArtist(userId: string) {
+    const user = await this.prisma.user.findFirst({
+      where: { id: userId, status: true },
+      select: { id: true, role: true },
+    });
+
+    // Si no existe o ya es artista, no hacer nada
+    if (!user || user.role === 'ARTIST') {
+      this.logger.log(`User ${userId} already ARTIST or not found, skipping promotion`);
+      return null;
+    }
+
+    const updatedUser = await this.prisma.user.update({
+      where: { id: userId },
+      data: { role: 'ARTIST' },
+      select: USER_SELECT,
+    });
+
+    this.logger.log(`User ${userId} promoted to ARTIST`);
+    return updatedUser;
   }
 }

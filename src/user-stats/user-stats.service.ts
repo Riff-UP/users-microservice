@@ -30,4 +30,9 @@ export class UserStatsService {
       )
       .exec();
   }
+
+  async delete(sqlUserId: string): Promise<{ deletedCount: number }> {
+    const result = await this.userStatsModel.deleteOne({ sqlUserId }).exec();
+    return { deletedCount: result.deletedCount ?? 0 };
+  }
 }

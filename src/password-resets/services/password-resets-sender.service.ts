@@ -20,7 +20,7 @@ export class PasswordResetsSenderService implements OnModuleInit {
       transport: Transport.RMQ,
       options: {
         urls: [envs.rabbit_url],
-        queue: 'riff_queue',
+        queue: 'notifications_queue',
       },
     });
   }
@@ -46,6 +46,9 @@ export class PasswordResetsSenderService implements OnModuleInit {
         expiresAt: new Date(Date.now() + 900_000),
       },
     });
+
+    // eliminar antes de producción
+    this.logger.log(`RAW TOKEN (solo para testing): ${rawToken}`);
 
     this.client.emit('send.resetPassword', {
       mail: user!.email,

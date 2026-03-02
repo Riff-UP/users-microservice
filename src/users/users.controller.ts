@@ -1,5 +1,5 @@
 import { Controller, ParseUUIDPipe } from '@nestjs/common';
-import { MessagePattern, Payload } from '@nestjs/microservices';
+import { EventPattern, MessagePattern, Payload } from '@nestjs/microservices';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -61,5 +61,11 @@ export class UsersController {
   @MessagePattern('addPassword')
   addPassword(@Payload() payload: { id: string; newPassword: string }) {
     return this.usersService.addPassword(payload.id, payload.newPassword);
+  }
+
+  // Escucha cuando un usuario publica contenido (post o evento)
+  @EventPattern('user.publishedContent')
+  handleUserPublishedContent(@Payload() data: { userId: string }) {
+    return this.usersService.promoteToArtist(data.userId);
   }
 }

@@ -19,14 +19,17 @@ async function bootstrap() {
   });
 
   // Conectar RabbitMQ como microservicio
+  // Consumir de users_queue que está bindeada al exchange riff_events
   app.connectMicroservice({
     transport: Transport.RMQ,
     options: {
       urls: [envs.rabbit_url],
-      queue: 'riff_queue',
+      queue: 'users_queue',
       queueOptions: {
         durable: true,
       },
+      // No necesitamos especificar noAck: false es el default
+      // Los mensajes se confirmarán automáticamente después del handler
     },
   });
 
@@ -44,4 +47,4 @@ async function bootstrap() {
   logger.log(`RabbitMQ connected`);
 }
 
-bootstrap();
+void bootstrap();

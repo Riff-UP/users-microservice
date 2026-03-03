@@ -1,29 +1,17 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { PrismaService } from 'prisma/prisma.service';
 import { MailDto } from '../dto/mail.dto';
-import {
-  ClientProxy,
-  ClientProxyFactory,
-  Transport,
-} from '@nestjs/microservices';
 import { randomBytes, createHash } from 'node:crypto';
-import { envs } from '../../config';
-import { RpcExceptionHelper } from '../../common';
+import { RpcExceptionHelper, PublisherService } from '../../common';
 
 @Injectable()
 export class PasswordResetsSenderService implements OnModuleInit {
   private readonly logger = new Logger('PasswordResetsSenderService');
-  private client: ClientProxy;
 
-  constructor(private readonly prisma: PrismaService) {
-    this.client = ClientProxyFactory.create({
-      transport: Transport.RMQ,
-      options: {
-        urls: [envs.rabbit_url],
-        queue: 'riff_queue',
-      },
-    });
-  }
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly publisher: PublisherService
+  ) {}
 
   onModuleInit() {
     this.logger.log('PasswordResetsSenderService initialized');
@@ -50,7 +38,7 @@ export class PasswordResetsSenderService implements OnModuleInit {
     // eliminar antes de producción
     this.logger.log(`RAW TOKEN (solo para testing): ${rawToken}`);
 
-    this.client.emit('send.resetPassword', {
+    await this.publisher.publish('send.resetPassword', {
       mail: user!.email,
       userId: user!.id,
       userName: user!.name,

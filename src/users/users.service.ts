@@ -5,13 +5,8 @@ import { PrismaService } from 'prisma/prisma.service';
 import { UserStatsService } from 'src/user-stats/user-stats.service';
 import * as jwt from 'jsonwebtoken';
 import * as bcrypt from 'bcrypt';
-import {
-  ClientProxy,
-  ClientProxyFactory,
-  Transport,
-} from '@nestjs/microservices';
 import { envs } from '../config';
-import { RpcExceptionHelper } from 'src/common';
+import { RpcExceptionHelper, PublisherService } from 'src/common';
 
 const USER_SELECT = {
   id: true,
@@ -27,21 +22,12 @@ const USER_SELECT = {
 @Injectable()
 export class UsersService implements OnModuleInit {
   private readonly logger = new Logger('UsersService');
-  private client: ClientProxy;
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly userStatsService: UserStatsService
-  ) {
-    this.client = ClientProxyFactory.create({
-      transport: Transport.RMQ,
-      options: {
-        urls: [envs.rabbit_url],
-        queue: 'riff_queue',
-        queueOptions: { durable: true },
-      },
-    });
-  }
+    private readonly userStatsService: UserStatsService,
+    private readonly publisher: PublisherService
+  ) {}
 
   onModuleInit() {
     this.logger.log('UsersService initialized');
@@ -148,7 +134,7 @@ export class UsersService implements OnModuleInit {
     await this.userStatsService.delete(id);
 
     // Emitir evento para que otros microservicios (posts, events) reaccionen
-    this.client.emit('user.deactivated', { userId: id });
+    await this.publisher.publish('user.deactivated', { userId: id });
     this.logger.log(`User with id ${id} deactivated`);
 
     return { message: 'Account deactivated succesfully' };

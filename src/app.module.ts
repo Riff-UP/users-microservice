@@ -8,6 +8,7 @@ import { PrismaModule } from 'prisma/prisma.module';
 import { ConfigModule } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { envs } from './config';
+import { PublisherService } from './common';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { envs } from './config';
     PrismaModule,
   ],
   controllers: [],
-  providers: [],
+  providers: [PublisherService],
+  exports: [PublisherService],
 })
 export class AppModule {}

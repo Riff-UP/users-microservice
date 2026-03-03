@@ -1,30 +1,16 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { CreateUserFollowDto } from './dto/create-user-follow.dto';
 import { PrismaService } from 'prisma/prisma.service';
-import {
-  ClientProxy,
-  ClientProxyFactory,
-  Transport,
-} from '@nestjs/microservices';
-import { envs } from 'src/config';
-import { RpcExceptionHelper } from 'src/common';
+import { RpcExceptionHelper, PublisherService } from 'src/common';
 
 @Injectable()
 export class UserFollowsService implements OnModuleInit {
   private readonly logger = new Logger('UserFollowsService');
 
-  private client: ClientProxy;
-
-  constructor(private readonly prisma: PrismaService) {
-    this.client = ClientProxyFactory.create({
-      transport: Transport.RMQ,
-      options: {
-        urls: [envs.rabbit_url],
-        queue: 'riff_queue',
-        queueOptions: { durable: true },
-      },
-    });
-  }
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly publisher: PublisherService
+  ) {}
 
   onModuleInit() {
     this.logger.log('UserFollowsService initialized');
@@ -47,7 +33,7 @@ export class UserFollowsService implements OnModuleInit {
       });
 
       // ECST: emitir evento follow.removed
-      this.client.emit('follow.removed', {
+      await this.publisher.publish('follow.removed', {
         follower_id: followerId,
         followed_id: followedId,
       });
@@ -69,7 +55,7 @@ export class UserFollowsService implements OnModuleInit {
       select: { email: true, name: true },
     });
 
-    this.client.emit('follow.created', {
+    await this.publisher.publish('follow.created', {
       follower_id: followerId,
       follower_email: follower!.email,
       follower_name: follower!.name,

@@ -36,6 +36,8 @@ model User {
   following UserFollows[] @relation("follower")
   followers UserFollows[] @relation("followed")
   passwordResets PasswordReset[]
+  eventAttendances EventAttendance[]
+  eventRatings EventRating[]
 
   @@map("users")
 }
@@ -83,4 +85,44 @@ model UserFollows {
 
   @@id([followerId, followedId])
   @@map("user_follows")
+}
+
+/// Registra la asistencia de un usuario (artista) a un evento.
+/// Fuente de datos para EventAttendanceChart.
+model EventAttendance {
+  id        String   @id @default(uuid())
+
+  userId    String   @map("user_id")
+
+  eventId   String   @map("event_id")
+
+  eventName String   @map("event_name")
+
+  attendedAt DateTime @default(now()) @map("attended_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("event_attendances")
+}
+
+/// Registra la calificación (0–5) que recibe un evento asociado a un usuario (artista).
+/// Fuente de datos para EventRatingChart.
+model EventRating {
+  id        String   @id @default(uuid())
+
+  userId    String   @map("user_id")
+
+  eventId   String   @map("event_id")
+
+  eventName String   @map("event_name")
+
+  /// Valor entre 0.0 y 5.0
+  rating    Decimal  @db.Decimal(3, 2)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, eventId])
+  @@map("event_ratings")
 }

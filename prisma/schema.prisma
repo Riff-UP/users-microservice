@@ -26,6 +26,8 @@ model User {
 
   biography String? @default("Sin biografía")
 
+  profileImage String? @map("profile_image")
+
   role UserRole @default(USER)
 
   status Boolean @default(true) // soft delete

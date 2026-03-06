@@ -18,6 +18,11 @@ export class SocialMediaController {
     return this.socialMediaService.findAll();
   }
 
+  @MessagePattern('findSocialMediaByUserId')
+  findByUserId(@Payload() payload: { userId: string }) {
+    return this.socialMediaService.findByUserId(payload.userId);
+  }
+
   @MessagePattern('findOneSocialMedia')
   findOne(@Payload(new ParseUUIDPipe()) id: string) {
     return this.socialMediaService.findOne(id);

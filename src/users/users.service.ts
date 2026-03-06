@@ -14,6 +14,7 @@ const USER_SELECT = {
   email: true,
   googleId: true,
   biography: true,
+  profileImage: true,
   role: true,
   status: true,
   createdAt: true,

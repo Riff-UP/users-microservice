@@ -24,6 +24,13 @@ export class SocialMediaService implements OnModuleInit {
     return await this.prisma.socialMedia.findMany();
   }
 
+  async findByUserId(userId: string) {
+    return await this.prisma.socialMedia.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
   async findOne(id: string) {
     const socialMedia = await this.prisma.socialMedia.findFirst({
       where: { id },

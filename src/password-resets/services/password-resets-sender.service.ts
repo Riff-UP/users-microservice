@@ -52,6 +52,14 @@ export class PasswordResetsSenderService implements OnModuleInit {
     });
 
     this.logger.log('Evento emitido: send.resetPassword');
-    return { message: 'Password reset email sent' };
+    // Include both id and userId for compatibility across gateway versions.
+    return {
+      message: 'Password reset email sent',
+      id: user!.id,
+      userId: user!.id,
+      mail: user!.email,
+      email: user!.email,
+      userName: user!.name,
+    };
   }
 }

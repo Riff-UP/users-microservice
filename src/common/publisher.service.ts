@@ -17,50 +17,74 @@ import { envs } from '../config';
 @Injectable()
 export class PublisherService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger('PublisherService');
-  private connection: amqp.AmqpConnectionManager;
+  private connection: amqp.AmqpConnectionManager | undefined;
   private channelWrapper: ChannelWrapper | undefined;
   private readonly EXCHANGE_NAME = 'riff_events';
   private ready = false;
+  private initInFlight: Promise<void> | undefined;
 
   async onModuleInit() {
-    this.logger.log('Inicializando conexión a RabbitMQ para publicación...');
-
-    this.connection = amqp.connect([envs.rabbit_url]);
-
-    this.connection.on('connect', () => {
-      this.logger.log('✅ Conexión a RabbitMQ establecida (Publisher)');
-    });
-
-    this.connection.on('disconnect', (err) => {
-      this.logger.warn('⚠️ Desconectado de RabbitMQ', err?.err?.message);
-      this.ready = false;
-    });
-
-    this.channelWrapper = this.connection.createChannel({
-      json: false,
-      setup: async (channel: Channel) => {
-        await channel.assertExchange(this.EXCHANGE_NAME, 'topic', {
-          durable: true,
-        });
-        this.ready = true;
-        this.logger.log(`Exchange ${this.EXCHANGE_NAME} asegurado`);
-      },
-    });
-
-    await this.channelWrapper.waitForConnect();
-    this.logger.log('PublisherService listo para publicar eventos');
+    await this.ensurePublisherInitialized();
   }
 
   async onModuleDestroy() {
     this.logger.log('Cerrando conexión a RabbitMQ...');
     await this.channelWrapper?.close();
-    await this.connection.close();
+    await this.connection?.close();
+  }
+
+  private async ensurePublisherInitialized() {
+    if (this.channelWrapper) return;
+
+    if (this.initInFlight) {
+      await this.initInFlight;
+      return;
+    }
+
+    this.initInFlight = (async () => {
+      this.logger.log('Inicializando conexión a RabbitMQ para publicación...');
+
+      this.connection = amqp.connect([envs.rabbit_url]);
+
+      this.connection.on('connect', () => {
+        this.logger.log('✅ Conexión a RabbitMQ establecida (Publisher)');
+      });
+
+      this.connection.on('disconnect', (err) => {
+        this.logger.warn('⚠️ Desconectado de RabbitMQ', err?.err?.message);
+        this.ready = false;
+      });
+
+      this.channelWrapper = this.connection.createChannel({
+        json: false,
+        setup: async (channel: Channel) => {
+          await channel.assertExchange(this.EXCHANGE_NAME, 'topic', {
+            durable: true,
+          });
+          this.ready = true;
+          this.logger.log(`Exchange ${this.EXCHANGE_NAME} asegurado`);
+        },
+      });
+
+      await this.channelWrapper.waitForConnect();
+      this.logger.log('PublisherService listo para publicar eventos');
+    })();
+
+    try {
+      await this.initInFlight;
+    } finally {
+      this.initInFlight = undefined;
+    }
   }
 
   /**
    * Publica un mensaje al exchange riff_events con una routing key específica
    */
   async publish(routingKey: string, payload: unknown): Promise<void> {
+    if (!this.channelWrapper) {
+      await this.ensurePublisherInitialized();
+    }
+
     if (!this.channelWrapper) {
       const message = `PublisherService sin canal para publicar evento: ${routingKey}`;
       this.logger.error(message);

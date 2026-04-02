@@ -3,6 +3,7 @@ import { EventPattern, MessagePattern, Payload } from '@nestjs/microservices';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { AnalyticsHypothesisDailyDto } from './dto';
 
 @Controller()
 export class UsersController {
@@ -66,6 +67,11 @@ export class UsersController {
   @MessagePattern('addPassword')
   addPassword(@Payload() payload: { id: string; newPassword: string }) {
     return this.usersService.addPassword(payload.id, payload.newPassword);
+  }
+
+  @MessagePattern('analyticsHypothesisDaily')
+  analyticsHypothesisDaily(@Payload() payload: AnalyticsHypothesisDailyDto) {
+    return this.usersService.analyticsHypothesisDaily(payload);
   }
 
   // Escucha cuando un usuario publica contenido (post o evento)

@@ -7,6 +7,7 @@ import * as jwt from 'jsonwebtoken';
 import * as bcrypt from 'bcrypt';
 import { envs } from '../config';
 import { RpcExceptionHelper, PublisherService } from 'src/common';
+import { AnalyticsHypothesisDailyDto } from './dto';
 
 const USER_SELECT = {
   id: true,
@@ -273,5 +274,97 @@ export class UsersService implements OnModuleInit {
 
     this.logger.log(`User ${userId} promoted to ARTIST`);
     return updatedUser;
+  }
+
+  async analyticsHypothesisDaily(payload: AnalyticsHypothesisDailyDto) {
+    const scope = payload.scope ?? 'global';
+    const fromDate = new Date(payload.from);
+    const toDate = new Date(payload.to);
+
+    if (Number.isNaN(fromDate.getTime()) || Number.isNaN(toDate.getTime())) {
+      RpcExceptionHelper.badRequest('from and to must be valid ISO dates');
+    }
+
+    if (fromDate > toDate) {
+      RpcExceptionHelper.badRequest('from must be less than or equal to to');
+    }
+
+    if (scope === 'user' && !payload.userId?.trim()) {
+      RpcExceptionHelper.badRequest('userId is required when scope is user');
+    }
+
+    const fromDay = payload.from.slice(0, 10);
+    const toDay = payload.to.slice(0, 10);
+
+    type DailyRow = {
+      date: string;
+      newUsers: number;
+      newFollows: number;
+      newReactions: number;
+    };
+
+    const userFollowsFilter =
+      scope === 'user'
+        ? this.prisma.$queryRaw<DailyRow[]>`
+            WITH days AS (
+              SELECT generate_series(${fromDay}::date, ${toDay}::date, interval '1 day')::date AS day
+            ),
+            users_by_day AS (
+              SELECT DATE(u.created_at) AS day, COUNT(*)::int AS total
+              FROM users u
+              WHERE u.status = true
+                AND u.created_at >= ${fromDay}::date
+                AND u.created_at < (${toDay}::date + interval '1 day')
+              GROUP BY DATE(u.created_at)
+            ),
+            follows_by_day AS (
+              SELECT DATE(uf.created_at) AS day, COUNT(*)::int AS total
+              FROM user_follows uf
+              WHERE uf.created_at >= ${fromDay}::date
+                AND uf.created_at < (${toDay}::date + interval '1 day')
+                AND uf.followed_id = ${payload.userId!}
+              GROUP BY DATE(uf.created_at)
+            )
+            SELECT
+              to_char(d.day, 'YYYY-MM-DD') AS date,
+              COALESCE(ubd.total, 0) AS "newUsers",
+              COALESCE(fbd.total, 0) AS "newFollows",
+              0::int AS "newReactions"
+            FROM days d
+            LEFT JOIN users_by_day ubd ON ubd.day = d.day
+            LEFT JOIN follows_by_day fbd ON fbd.day = d.day
+            ORDER BY d.day ASC
+          `
+        : this.prisma.$queryRaw<DailyRow[]>`
+            WITH days AS (
+              SELECT generate_series(${fromDay}::date, ${toDay}::date, interval '1 day')::date AS day
+            ),
+            users_by_day AS (
+              SELECT DATE(u.created_at) AS day, COUNT(*)::int AS total
+              FROM users u
+              WHERE u.status = true
+                AND u.created_at >= ${fromDay}::date
+                AND u.created_at < (${toDay}::date + interval '1 day')
+              GROUP BY DATE(u.created_at)
+            ),
+            follows_by_day AS (
+              SELECT DATE(uf.created_at) AS day, COUNT(*)::int AS total
+              FROM user_follows uf
+              WHERE uf.created_at >= ${fromDay}::date
+                AND uf.created_at < (${toDay}::date + interval '1 day')
+              GROUP BY DATE(uf.created_at)
+            )
+            SELECT
+              to_char(d.day, 'YYYY-MM-DD') AS date,
+              COALESCE(ubd.total, 0) AS "newUsers",
+              COALESCE(fbd.total, 0) AS "newFollows",
+              0::int AS "newReactions"
+            FROM days d
+            LEFT JOIN users_by_day ubd ON ubd.day = d.day
+            LEFT JOIN follows_by_day fbd ON fbd.day = d.day
+            ORDER BY d.day ASC
+          `;
+
+    return await userFollowsFilter;
   }
 }
